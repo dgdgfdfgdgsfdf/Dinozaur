@@ -1,0 +1,40 @@
+# Visual Studio
+.vs/
+*.suo
+*.user
+*.sln.docstates
+
+# Build folders
+Debug/
+Release/
+x64/
+x86/
+
+# Output files
+*.exe
+*.dll
+*.lib
+*.pdb
+*.obj
+*.idb
+*.ipch
+*.log
+*.tlog
+*.lastbuildstate
+*.cache
+*.ilk
+*.pch
+*.aps
+*.ncb
+*.opendb
+*.VC.db
+*.VC.opendb
+
+# CMake
+CMakeFiles/
+CMakeCache.txt
+cmake-build-*/
+
+# Others
+*.pyc
+*.class

@@ -1,0 +1,666 @@
+#define GAMELOGIC_EXPORTS
+#include "gamelogic.h"
+#include "API.h"
+#include <iostream>
+#include <algorithm>
+#include <cmath>
+
+static DinoGame* g_game = nullptr;
+static sf::RenderWindow* g_window = nullptr;
+
+// Implementacja klasy DinoGame
+DinoGame::DinoGame()
+    : window(nullptr), dinoY(0), dinoVelocityY(0), gameSpeed(INITIAL_SPEED),
+    nextSpawnScore(BASE_SPAWN_INTERVAL), currentSpawnInterval(BASE_SPAWN_INTERVAL),
+    isGameRunning(false), isJumping(false), isCrouching(false),
+    score(0), highScore(0), scoreTimer(0), groundOffsetX(0),
+    hasGroundTexture(false),
+    rng(std::random_device{}()),
+    birdHeightDist(350.0f, 400.0f),
+    obstacleTypeDist(1, 3),
+    entityTypeDist(1, 100),
+    spawnVariationDist(-5, 5),
+    animationTimer(0), currentDinoFrame(0), currentBirdFrame(0) {
+    LoadHighScore();
+}
+
+DinoGame::~DinoGame() {
+    SaveHighScore();
+    Cleanup();
+}
+
+bool DinoGame::Initialize(sf::RenderWindow* gameWindow) {
+    window = gameWindow;
+
+    if (!window) {
+        return false;
+    }
+
+    // Ladowanie tekstur
+    if (!LoadTextures()) {
+        return false;
+    }
+
+    // Proba zaladowania tekstury podloza
+    if (!LoadGroundTexture("ground.png")) {
+        std::cout << "Nie zaladowano tekstury podloza" << std::endl;
+    }
+
+    // Ladowanie fontu
+    if (!font.loadFromFile("arial.ttf")) {
+        // Domyslny font systemu
+    }
+
+    // Inicjalizacja tekstu wyniku
+    scoreText.setFont(font);
+    scoreText.setCharacterSize(24);
+    scoreText.setFillColor(sf::Color::Black);
+    scoreText.setPosition(window->getSize().x - 150, 20);
+
+    highScoreText.setFont(font);
+    highScoreText.setCharacterSize(18);
+    highScoreText.setFillColor(sf::Color::Black);
+    highScoreText.setPosition(window->getSize().x - 150, 50);
+
+    gameOverText.setFont(font);
+    gameOverText.setCharacterSize(36);
+    gameOverText.setFillColor(sf::Color::Red);
+    gameOverText.setString("GAME OVER");
+    sf::FloatRect textBounds = gameOverText.getLocalBounds();
+    gameOverText.setPosition(
+        (window->getSize().x - textBounds.width) / 2,
+        (window->getSize().y - textBounds.height) / 2
+    );
+
+    // Inicjalizacja dinozaura
+    dinoSprite.setTexture(dinoRunTexture1);
+
+    // Skalowanie dinozaura do odpowiedniego rozmiaru
+    sf::Vector2u textureSize = dinoRunTexture1.getSize();
+    if (textureSize.x > 0 && textureSize.y > 0) {
+        float scaleX = DINO_SIZE / textureSize.x;
+        float scaleY = DINO_SIZE / textureSize.y;
+        dinoSprite.setScale(scaleX, scaleY);
+    }
+
+    dinoSprite.setPosition(DINO_X, GROUND_Y - DINO_SIZE);
+    dinoY = GROUND_Y - DINO_SIZE;
+
+    // Reset stanu gry
+    Restart();
+
+    return true;
+}
+
+bool DinoGame::LoadTextures() {
+    // Ladowanie tekstur dinozaura
+    if (!dinoRunTexture1.loadFromFile("dino_run1.png")) {
+        std::cerr << "Nie mozna zaladowaæ pliku" << std::endl;
+        sf::Image img;
+        img.create(44, 44, sf::Color::Green);
+        dinoRunTexture1.loadFromImage(img);
+    }
+
+    if (!dinoRunTexture2.loadFromFile("dino_run2.png")) {
+        std::cerr << "Nie mozna zaladowac pliku" << std::endl;
+        dinoRunTexture2 = dinoRunTexture1;
+    }
+
+    if (!dinoDeadTexture.loadFromFile("dino_dead.png")) {
+        std::cerr << "Nie mozna zaladowac pliku" << std::endl;
+        sf::Image img;
+        img.create(44, 44, sf::Color::Red);
+        dinoDeadTexture.loadFromImage(img);
+    }
+
+    // Ladowanie tekstur ptakow
+    if (!birdTexture1.loadFromFile("bird1.png")) {
+        std::cerr << "Nie mo¿na zaladowac pliku" << std::endl;
+        sf::Image img;
+        img.create(80, 70, sf::Color::Blue);
+        birdTexture1.loadFromImage(img);
+    }
+
+    if (!birdTexture2.loadFromFile("bird2.png")) {
+        std::cerr << "Nie mozna zaladowac pliku" << std::endl;
+        birdTexture2 = birdTexture1;
+    }
+
+    // Ladowanie tekstur przeszkod
+    if (!obstacleTexture1.loadFromFile("obstacle1.png")) {
+        std::cerr << "Nie mozna zaladowac pliku" << std::endl;
+        sf::Image img;
+        img.create(25, 50, sf::Color::Black);
+        obstacleTexture1.loadFromImage(img);
+    }
+
+    if (!obstacleTexture2.loadFromFile("obstacle2.png")) {
+        std::cerr << "Nie mo¿na zaladowac pliku" << std::endl;
+        sf::Image img;
+        img.create(25, 60, sf::Color::Black);
+        obstacleTexture2.loadFromImage(img);
+    }
+
+    if (!obstacleTexture3.loadFromFile("obstacle3.png")) {
+        std::cerr << "Nie mozna zaladowac pliku" << std::endl;
+        sf::Image img;
+        img.create(25, 70, sf::Color::Black);
+        obstacleTexture3.loadFromImage(img);
+    }
+
+    std::cout << "Tekstury zostaly zaladowane!" << std::endl;
+    return true;
+}
+
+bool DinoGame::LoadGroundTexture(const std::string& filename) {
+    if (groundTexture.loadFromFile(filename)) {
+        hasGroundTexture = true;
+        groundSprite.setTexture(groundTexture);
+
+        groundSprite.setPosition(0, GROUND_Y-10);
+
+        groundOffsetX = 0;
+
+        return true;
+    }
+
+    hasGroundTexture = false;
+    return false;
+}
+
+void DinoGame::LoadHighScore() {
+    std::ifstream file("highscore.txt");
+    if (file.is_open()) {
+        file >> highScore;
+        file.close();
+    }
+}
+
+void DinoGame::SaveHighScore() {
+    std::ofstream file("highscore.txt");
+    if (file.is_open()) {
+        file << highScore;
+        file.close();
+    }
+}
+
+void DinoGame::Restart() {
+    isGameRunning = true;
+    isJumping = false;
+    isCrouching = false;
+    score = 0;
+    scoreTimer = 0;
+    gameSpeed = INITIAL_SPEED;
+    nextSpawnScore = BASE_SPAWN_INTERVAL;
+    currentSpawnInterval = BASE_SPAWN_INTERVAL;
+    animationTimer = 0;
+    currentDinoFrame = 0;
+    currentBirdFrame = 0;
+    groundOffsetX = 0;
+
+    dinoY = GROUND_Y - DINO_SIZE;
+    dinoVelocityY = 0;
+    dinoSprite.setPosition(DINO_X, dinoY);
+    dinoSprite.setTexture(dinoRunTexture1);
+
+    obstacleSprites.clear();
+    birdSprites.clear();
+}
+
+bool DinoGame::Update(float deltaTime) {
+    if (!isGameRunning) {
+        return true;
+    }
+
+    UpdateAnimations(deltaTime);
+    UpdatePhysics(deltaTime);
+    UpdateEntities(deltaTime);
+    UpdateGround(deltaTime);
+    UpdateScore(deltaTime);
+    CheckCollisions();
+
+    return true;
+}
+
+void DinoGame::UpdateAnimations(float deltaTime) {
+    animationTimer += deltaTime;
+
+    // Animacja dinozaura
+    if (animationTimer >= 0.1f) {
+        if (!isGameRunning) {
+            dinoSprite.setTexture(dinoDeadTexture);
+        }
+        else if (!isJumping) {
+            currentDinoFrame = (currentDinoFrame + 1) % 2;
+            if (currentDinoFrame == 0) {
+                dinoSprite.setTexture(dinoRunTexture1);
+            }
+            else {
+                dinoSprite.setTexture(dinoRunTexture2);
+            }
+        }
+
+        // Animacja ptakow
+        currentBirdFrame = (currentBirdFrame + 1) % 2;
+        for (auto& bird : birdSprites) {
+            if (currentBirdFrame == 0) {
+                bird.setTexture(birdTexture1);
+            }
+            else {
+                bird.setTexture(birdTexture2);
+            }
+        }
+
+        animationTimer = 0;
+    }
+}
+
+void DinoGame::UpdatePhysics(float deltaTime) {
+    if (isJumping) {
+        dinoVelocityY += GRAVITY * deltaTime;
+        dinoY += dinoVelocityY * deltaTime;
+
+        float groundLevel = GROUND_Y - DINO_SIZE;
+        if (dinoY >= groundLevel) {
+            dinoY = groundLevel;
+            dinoVelocityY = 0;
+            isJumping = false;
+        }
+    }
+    else {
+        dinoY = GROUND_Y - DINO_SIZE;
+    }
+
+    dinoSprite.setPosition(DINO_X, dinoY);
+}
+
+void DinoGame::UpdateEntities(float deltaTime) {
+    // Aktualizowanie pozycji przeszkod
+    for (auto& obstacle : obstacleSprites) {
+        sf::Vector2f pos = obstacle.getPosition();
+        pos.x -= gameSpeed * deltaTime;
+        obstacle.setPosition(pos);
+    }
+
+    // Aktualizowanie pozycji ptakow
+    for (auto& bird : birdSprites) {
+        sf::Vector2f pos = bird.getPosition();
+        pos.x -= gameSpeed * deltaTime;
+        bird.setPosition(pos);
+    }
+
+    // Usuwanie przeszkod ktore wyszly poza ekran
+    obstacleSprites.erase(
+        std::remove_if(obstacleSprites.begin(), obstacleSprites.end(),
+            [](const sf::Sprite& obs) {
+                return obs.getPosition().x < -100;
+            }),
+        obstacleSprites.end()
+    );
+
+    // Usuwanie ptakow ktore wyszly poza ekran
+    birdSprites.erase(
+        std::remove_if(birdSprites.begin(), birdSprites.end(),
+            [](const sf::Sprite& bird) {
+                return bird.getPosition().x < -100;
+            }),
+        birdSprites.end()
+    );
+
+    CheckForSpawn();
+
+    // Zwiekszanie predkosci
+    gameSpeed += SPEED_INCREASE * deltaTime;
+}
+
+void DinoGame::CheckForSpawn() {
+    if (score >= nextSpawnScore) {
+        SpawnRandomEntity();
+
+        currentSpawnInterval = CalculateSpawnInterval(score);
+        int variation = spawnVariationDist(rng);
+        nextSpawnScore = score + currentSpawnInterval + variation;
+
+        std::cout << "Spawn at score: " << score << ", next spawn: " << nextSpawnScore << std::endl;
+    }
+}
+
+int DinoGame::CalculateSpawnInterval(int currentScore) {
+    int interval = BASE_SPAWN_INTERVAL - (currentScore / 20);
+
+    if (interval < MIN_SPAWN_INTERVAL) {
+        interval = MIN_SPAWN_INTERVAL;
+    }
+
+    return interval;
+}
+
+void DinoGame::SpawnRandomEntity() {
+    if (score < BIRD_SPAWN_SCORE) {
+        SpawnObstacle();
+        return;
+    }
+
+    // 70% szans na przeszkode, 30% na ptaka
+    int randomChoice = entityTypeDist(rng);
+
+    if (randomChoice <= 70) {
+        SpawnObstacle();
+    }
+    else {
+        SpawnBird();
+    }
+}
+
+void DinoGame::UpdateGround(float deltaTime) {
+    if (hasGroundTexture) {
+        groundOffsetX -= gameSpeed * deltaTime;
+
+        float textureWidth = static_cast<float>(groundTexture.getSize().x);
+
+        if (groundOffsetX <= -textureWidth) {
+            groundOffsetX = 0;
+        }
+
+        groundSprite.setPosition(groundOffsetX, groundSprite.getPosition().y);
+    }
+}
+
+void DinoGame::SpawnObstacle() {
+    sf::Sprite obstacle;
+
+    int obstacleType = obstacleTypeDist(rng);
+
+    switch (obstacleType) {
+    case 1:
+        obstacle.setTexture(obstacleTexture1);
+        break;
+    case 2:
+        obstacle.setTexture(obstacleTexture2);
+        break;
+    case 3:
+        obstacle.setTexture(obstacleTexture3);
+        break;
+    }
+
+    sf::Vector2u textureSize = obstacle.getTexture()->getSize();
+    if (textureSize.x > 0 && textureSize.y > 0) {
+        float scaleX = OBSTACLE_WIDTH / textureSize.x;
+        float scaleY = OBSTACLE_HEIGHT / textureSize.y;
+        obstacle.setScale(scaleX, scaleY);
+    }
+
+    float groundY = GROUND_Y - OBSTACLE_HEIGHT;
+    obstacle.setPosition(window->getSize().x, groundY);
+
+    obstacleSprites.push_back(obstacle);
+}
+
+void DinoGame::SpawnBird() {
+    sf::Sprite bird;
+    bird.setTexture(birdTexture1);
+
+    sf::Vector2u textureSize = birdTexture1.getSize();
+    if (textureSize.x > 0 && textureSize.y > 0) {
+        float scaleX = BIRD_WIDTH / textureSize.x;
+        float scaleY = BIRD_HEIGHT / textureSize.y;
+        bird.setScale(scaleX, scaleY);
+    }
+
+    float birdY = birdHeightDist(rng);
+    bird.setPosition(window->getSize().x, birdY);
+
+    birdSprites.push_back(bird);
+}
+
+void DinoGame::UpdateScore(float deltaTime) {
+    scoreTimer += deltaTime;
+    if (scoreTimer >= 0.1f) {
+        score++;
+        scoreTimer = 0;
+
+        if (score > highScore) {
+            highScore = score;
+        }
+    }
+}
+
+void DinoGame::CheckCollisions() {
+    // Sprawdzanie kolizji z przeszkodami
+    for (const auto& obstacle : obstacleSprites) {
+        if (CheckSpriteCollision(dinoSprite, obstacle)) {
+            isGameRunning = false;
+            SaveHighScore();
+            break;
+        }
+    }
+
+    // Sprawdzanie kolizji z ptakami
+    if (isGameRunning) {
+        for (const auto& bird : birdSprites) {
+            if (CheckSpriteCollision(dinoSprite, bird)) {
+                isGameRunning = false;
+                SaveHighScore();
+                break;
+            }
+        }
+    }
+}
+
+bool DinoGame::CheckSpriteCollision(const sf::Sprite& sprite1, const sf::Sprite& sprite2) {
+    sf::FloatRect bounds1 = sprite1.getGlobalBounds();
+    sf::FloatRect bounds2 = sprite2.getGlobalBounds();
+
+    // Zmniejszanie obszaru kolizji dla bardziej sprawiedliwej gry
+    bounds1.left += 4;
+    bounds1.top += 4;
+    bounds1.width -= 8;
+    bounds1.height -= 8;
+
+    bounds2.left += 2;
+    bounds2.top += 2;
+    bounds2.width -= 4;
+    bounds2.height -= 4;
+
+    return bounds1.intersects(bounds2);
+}
+
+bool DinoGame::CheckCollision(const sf::RectangleShape& rect1, const sf::RectangleShape& rect2) {
+    sf::FloatRect bounds1 = rect1.getGlobalBounds();
+    sf::FloatRect bounds2 = rect2.getGlobalBounds();
+
+    bounds1.left += 2;
+    bounds1.top += 2;
+    bounds1.width -= 4;
+    bounds1.height -= 4;
+
+    return bounds1.intersects(bounds2);
+}
+
+void DinoGame::Jump() {
+    if (!isJumping && isGameRunning) {
+        dinoVelocityY = JUMP_FORCE;
+        isJumping = true;
+        isCrouching = false;
+    }
+}
+
+void DinoGame::Crouch(bool crouch) {
+    if (isGameRunning && !isJumping) {
+        isCrouching = crouch;
+    }
+}
+
+void DinoGame::Render() {
+    if (!window) return;
+
+    sf::Color bgColor = sf::Color(247, 247, 247);
+    window->clear(bgColor);
+
+    if (hasGroundTexture) {
+        float textureWidth = static_cast<float>(groundTexture.getSize().x);
+        float windowWidth = static_cast<float>(window->getSize().x);
+
+        window->draw(groundSprite);
+
+        sf::Sprite secondGround = groundSprite;
+        secondGround.setPosition(groundOffsetX + textureWidth, groundSprite.getPosition().y);
+        window->draw(secondGround);
+
+        if (textureWidth < windowWidth) {
+            int copies = static_cast<int>(std::ceil(windowWidth / textureWidth)) + 1;
+
+            for (int i = 1; i <= copies; i++) {
+                sf::Sprite additionalGround = groundSprite;
+                additionalGround.setPosition(groundOffsetX + (textureWidth * i), groundSprite.getPosition().y);
+                window->draw(additionalGround);
+            }
+        }
+    }
+    else {
+        sf::RectangleShape groundLine;
+        groundLine.setSize(sf::Vector2f(window->getSize().x, 5));
+        groundLine.setPosition(0, GROUND_Y);
+        groundLine.setFillColor(sf::Color::Black);
+        window->draw(groundLine);
+    }
+
+    // Rysuj dinozaura
+    dinoSprite.setColor(sf::Color::White);
+    window->draw(dinoSprite);
+
+    // Rysuj przeszkody
+    for (const auto& obstacle : obstacleSprites) {
+        sf::Sprite tempObstacle = obstacle;
+        tempObstacle.setColor(sf::Color::White);
+        window->draw(tempObstacle);
+    }
+
+    // Rysuj ptaki
+    for (const auto& bird : birdSprites) {
+        sf::Sprite tempBird = bird;
+        tempBird.setColor(sf::Color::White);
+        window->draw(tempBird);
+    }
+
+    // Rysuj interfejs uzytkownika
+    sf::Color textColor = sf::Color::Black;
+
+    scoreText.setFillColor(textColor);
+    highScoreText.setFillColor(textColor);
+
+    scoreText.setString("Score: " + std::to_string(score));
+    highScoreText.setString("High Score: " + std::to_string(highScore));
+
+    window->draw(scoreText);
+    window->draw(highScoreText);
+
+    // Rysuj komunikat o koncu gry
+    if (!isGameRunning) {
+        gameOverText.setFillColor(sf::Color::Red);
+        window->draw(gameOverText);
+    }
+
+    window->display();
+}
+
+void DinoGame::Cleanup() {
+    obstacleSprites.clear();
+    birdSprites.clear();
+    window = nullptr;
+}
+
+// Implementacja API C
+extern "C" {
+    GAMELOGIC_API bool InitGame() {
+        if (g_game) {
+            delete g_game;
+        }
+
+        g_window = new sf::RenderWindow(sf::VideoMode(800, 600), "Chrome Dino Game");
+        g_game = new DinoGame();
+
+        if (!g_game->Initialize(g_window)) {
+            delete g_game;
+            delete g_window;
+            g_game = nullptr;
+            g_window = nullptr;
+            return false;
+        }
+
+        return true;
+    }
+
+    GAMELOGIC_API bool UpdateGame(float deltaTime) {
+        if (!g_game || !g_window) {
+            return false;
+        }
+
+        sf::Event event;
+        while (g_window->pollEvent(event)) {
+            if (event.type == sf::Event::Closed) {
+                return false;
+            }
+            if (event.type == sf::Event::KeyPressed) {
+                if (event.key.code == sf::Keyboard::Space || event.key.code == sf::Keyboard::Up) {
+                    if (g_game->IsRunning()) {
+                        g_game->Jump();
+                    }
+                    else {
+                        g_game->Restart();
+                    }
+                }
+                if (event.key.code == sf::Keyboard::Down) {
+                    g_game->Crouch(true);
+                }
+            }
+            if (event.type == sf::Event::KeyReleased) {
+                if (event.key.code == sf::Keyboard::Down) {
+                    g_game->Crouch(false);
+                }
+            }
+        }
+
+        return g_game->Update(deltaTime) && g_window->isOpen();
+    }
+
+    GAMELOGIC_API void RenderGame() {
+        if (g_game && g_window) {
+            g_game->Render();
+        }
+    }
+
+    GAMELOGIC_API void Jump() {
+        if (g_game) {
+            g_game->Jump();
+        }
+    }
+
+    GAMELOGIC_API void RestartGame() {
+        if (g_game) {
+            g_game->Restart();
+        }
+    }
+
+    GAMELOGIC_API bool IsGameRunning() {
+        return g_game ? g_game->IsRunning() : false;
+    }
+
+    GAMELOGIC_API int GetScore() {
+        return g_game ? g_game->GetScore() : 0;
+    }
+
+    GAMELOGIC_API void CleanupGame() {
+        if (g_game) {
+            g_game->Cleanup();
+            delete g_game;
+            g_game = nullptr;
+        }
+
+        if (g_window) {
+            g_window->close();
+            delete g_window;
+            g_window = nullptr;
+        }
+    }
+}

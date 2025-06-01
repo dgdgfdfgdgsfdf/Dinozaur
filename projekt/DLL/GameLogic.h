@@ -7,9 +7,11 @@
 const float GROUND_Y = 450.0f;
 const float DINO_X = 50.0f;
 const float DINO_SIZE = 44.0f;
-const float DINO_CROUCH_HEIGHT = 30.0f;
+const float DINO_CROUCH_HEIGHT = 32.0f;
 const float OBSTACLE_WIDTH = 25.0f;
 const float OBSTACLE_HEIGHT = 50.0f;
+const float OBSTACLE2_WIDTH = 40.0f;
+const float OBSTACLE3_WIDTH = 50.0f;
 const float BIRD_WIDTH = 46.0f;
 const float BIRD_HEIGHT = 40.0f;
 const float JUMP_FORCE = -500.0f;
@@ -19,7 +21,6 @@ const float SPEED_INCREASE = 5.0f;
 const int BIRD_SPAWN_SCORE = 300;
 const int BASE_SPAWN_INTERVAL = 1;
 const int MIN_SPAWN_INTERVAL = 20;
-const float GROUND_HEIGHT = 100.0f;
 
 class DinoGame {
 private:
@@ -28,7 +29,9 @@ private:
     // Tekstury dla roznych elementow gry
     sf::Texture dinoRunTexture1;      
     sf::Texture dinoRunTexture2;      
-    sf::Texture dinoDeadTexture;      
+    sf::Texture dinoDeadTexture;
+    sf::Texture dinoCrouchTexture1; 
+    sf::Texture dinoCrouchTexture2;
     sf::Texture birdTexture1;         
     sf::Texture birdTexture2;         
     sf::Texture obstacleTexture1;     
@@ -85,6 +88,8 @@ private:
     sf::Text highScoreText;
     sf::Text gameOverText;
 
+    void ApplyDinoScaling(float targetWidth, float targetHeight);
+
 public:
     DinoGame();
     ~DinoGame();
@@ -117,7 +122,6 @@ public:
 
     // Kolizje
     void CheckCollisions();
-    bool CheckCollision(const sf::RectangleShape& rect1, const sf::RectangleShape& rect2);
     bool CheckSpriteCollision(const sf::Sprite& sprite1, const sf::Sprite& sprite2);
 
     // Kontrola gracza

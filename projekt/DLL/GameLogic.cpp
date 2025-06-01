@@ -3,7 +3,8 @@
 #include "API.h"
 #include <iostream>
 #include <algorithm>
-#include <cmath>
+#include <stdexcept>
+
 
 static DinoGame* g_game = nullptr;
 static sf::RenderWindow* g_window = nullptr;
@@ -75,14 +76,6 @@ bool DinoGame::Initialize(sf::RenderWindow* gameWindow) {
     // Inicjalizacja dinozaura
     dinoSprite.setTexture(dinoRunTexture1);
 
-    // Skalowanie dinozaura do odpowiedniego rozmiaru
-    sf::Vector2u textureSize = dinoRunTexture1.getSize();
-    if (textureSize.x > 0 && textureSize.y > 0) {
-        float scaleX = DINO_SIZE / textureSize.x;
-        float scaleY = DINO_SIZE / textureSize.y;
-        dinoSprite.setScale(scaleX, scaleY);
-    }
-
     dinoSprite.setPosition(DINO_X, GROUND_Y - DINO_SIZE);
     dinoY = GROUND_Y - DINO_SIZE;
 
@@ -93,63 +86,71 @@ bool DinoGame::Initialize(sf::RenderWindow* gameWindow) {
 }
 
 bool DinoGame::LoadTextures() {
-    // Ladowanie tekstur dinozaura
-    if (!dinoRunTexture1.loadFromFile("dino_run1.png")) {
-        std::cerr << "Nie mozna zaladowaæ pliku" << std::endl;
-        sf::Image img;
-        img.create(44, 44, sf::Color::Green);
-        dinoRunTexture1.loadFromImage(img);
-    }
+    try {
+        // Ladowanie tekstur dinozaura
+        if (!dinoRunTexture1.loadFromFile("dino_run1.png")) {
+            throw std::runtime_error("Nie mozna zaladowac dino_run1.png");
+        }
 
-    if (!dinoRunTexture2.loadFromFile("dino_run2.png")) {
-        std::cerr << "Nie mozna zaladowac pliku" << std::endl;
-        dinoRunTexture2 = dinoRunTexture1;
-    }
+        if (!dinoRunTexture2.loadFromFile("dino_run2.png")) {
+            std::cerr << "Nie mozna zaladowac dino_run2.png" << std::endl;
+            dinoRunTexture2 = dinoRunTexture1;
+        }
 
-    if (!dinoDeadTexture.loadFromFile("dino_dead.png")) {
-        std::cerr << "Nie mozna zaladowac pliku" << std::endl;
-        sf::Image img;
-        img.create(44, 44, sf::Color::Red);
-        dinoDeadTexture.loadFromImage(img);
-    }
+        if (!dinoDeadTexture.loadFromFile("dino_dead.png")) {
+            std::cerr << "Nie mozna zaladowac dino_dead.png" << std::endl;
+            sf::Image img;
+            img.create(44, 44, sf::Color::Red);
+            dinoDeadTexture.loadFromImage(img);
+        }
 
-    // Ladowanie tekstur ptakow
-    if (!birdTexture1.loadFromFile("bird1.png")) {
-        std::cerr << "Nie mo¿na zaladowac pliku" << std::endl;
-        sf::Image img;
-        img.create(80, 70, sf::Color::Blue);
-        birdTexture1.loadFromImage(img);
-    }
+        if (!dinoCrouchTexture1.loadFromFile("dino_crouch1.png")) {
+            std::cerr << "Nie mozna zaladowac dino_crouch1.png" << std::endl;
+            dinoCrouchTexture1 = dinoRunTexture1;
+        }
 
-    if (!birdTexture2.loadFromFile("bird2.png")) {
-        std::cerr << "Nie mozna zaladowac pliku" << std::endl;
-        birdTexture2 = birdTexture1;
-    }
+        if (!dinoCrouchTexture2.loadFromFile("dino_crouch2.png")) {
+            std::cerr << "Nie mozna zaladowac dino_crouch2.png" << std::endl;
+            dinoCrouchTexture2 = dinoCrouchTexture1;
+        }
 
-    // Ladowanie tekstur przeszkod
-    if (!obstacleTexture1.loadFromFile("obstacle1.png")) {
-        std::cerr << "Nie mozna zaladowac pliku" << std::endl;
-        sf::Image img;
-        img.create(25, 50, sf::Color::Black);
-        obstacleTexture1.loadFromImage(img);
-    }
+        // Ladowanie tekstur ptakow
+        if (!birdTexture1.loadFromFile("bird1.png")) {
+            std::cerr << "Nie mozna zaladowac bird1.png" << std::endl;
+            sf::Image img;
+            img.create(80, 70, sf::Color::Blue);
+            birdTexture1.loadFromImage(img);
+        }
 
-    if (!obstacleTexture2.loadFromFile("obstacle2.png")) {
-        std::cerr << "Nie mo¿na zaladowac pliku" << std::endl;
-        sf::Image img;
-        img.create(25, 60, sf::Color::Black);
-        obstacleTexture2.loadFromImage(img);
-    }
+        if (!birdTexture2.loadFromFile("bird2.png")) {
+            std::cerr << "Nie mozna zaladowac bird2.png" << std::endl;
+            birdTexture2 = birdTexture1;
+        }
 
-    if (!obstacleTexture3.loadFromFile("obstacle3.png")) {
-        std::cerr << "Nie mozna zaladowac pliku" << std::endl;
-        sf::Image img;
-        img.create(25, 70, sf::Color::Black);
-        obstacleTexture3.loadFromImage(img);
-    }
+        // Ladowanie tekstur przeszkod
+        if (!obstacleTexture1.loadFromFile("obstacle1.png")) {
+            throw std::runtime_error("Nie mozna zaladowac obstacle1.png");
+        }
 
-    std::cout << "Tekstury zostaly zaladowane!" << std::endl;
-    return true;
+        if (!obstacleTexture2.loadFromFile("obstacle2.png")) {
+            throw std::runtime_error("Nie mozna zaladowac obstacle2.png");
+        }
+
+        if (!obstacleTexture3.loadFromFile("obstacle3.png")) {
+            throw std::runtime_error("Nie mozna zaladowac obstacle3.png");
+        }
+
+        std::cout << "Tekstury zostaly zaladowane!" << std::endl;
+        return true;
+    }
+    catch (const std::runtime_error& e) {
+        std::cerr << "Blad ladowania tekstur: " << e.what() << std::endl;
+        return false;
+    }
+    catch (...) {
+        std::cerr << "Nieznany blad podczas ladowania tekstur" << std::endl;
+        return false;
+    }
 }
 
 bool DinoGame::LoadGroundTexture(const std::string& filename) {
@@ -225,22 +226,36 @@ bool DinoGame::Update(float deltaTime) {
 void DinoGame::UpdateAnimations(float deltaTime) {
     animationTimer += deltaTime;
 
-    // Animacja dinozaura
     if (animationTimer >= 0.1f) {
         if (!isGameRunning) {
             dinoSprite.setTexture(dinoDeadTexture);
+            ApplyDinoScaling(DINO_SIZE, DINO_SIZE);
+        }
+        else if (isCrouching && !isJumping) {
+            currentDinoFrame = (currentDinoFrame + 1) % 2;
+
+            if (currentDinoFrame == 0) {
+                dinoSprite.setTexture(dinoCrouchTexture1);
+            }
+            else {
+                dinoSprite.setTexture(dinoCrouchTexture2);
+            }
+
+            ApplyDinoScaling(DINO_SIZE, DINO_CROUCH_HEIGHT);
         }
         else if (!isJumping) {
             currentDinoFrame = (currentDinoFrame + 1) % 2;
+
             if (currentDinoFrame == 0) {
                 dinoSprite.setTexture(dinoRunTexture1);
             }
             else {
                 dinoSprite.setTexture(dinoRunTexture2);
             }
+
+            ApplyDinoScaling(DINO_SIZE, DINO_SIZE);
         }
 
-        // Animacja ptakow
         currentBirdFrame = (currentBirdFrame + 1) % 2;
         for (auto& bird : birdSprites) {
             if (currentBirdFrame == 0) {
@@ -252,6 +267,18 @@ void DinoGame::UpdateAnimations(float deltaTime) {
         }
 
         animationTimer = 0;
+    }
+}
+
+void DinoGame::ApplyDinoScaling(float targetWidth, float targetHeight) {
+    dinoSprite.setScale(1.0f, 1.0f);
+
+    sf::Vector2u textureSize = dinoSprite.getTexture()->getSize();
+
+    if (textureSize.x > 0 && textureSize.y > 0) {
+        float scaleX = targetWidth / static_cast<float>(textureSize.x);
+        float scaleY = targetHeight / static_cast<float>(textureSize.y);
+        dinoSprite.setScale(scaleX, scaleY);
     }
 }
 
@@ -268,10 +295,73 @@ void DinoGame::UpdatePhysics(float deltaTime) {
         }
     }
     else {
-        dinoY = GROUND_Y - DINO_SIZE;
+        if (isCrouching) {
+            dinoY = GROUND_Y - DINO_CROUCH_HEIGHT;
+        }
+        else {
+            dinoY = GROUND_Y - DINO_SIZE;
+        }
     }
 
     dinoSprite.setPosition(DINO_X, dinoY);
+}
+
+bool DinoGame::CheckSpriteCollision(const sf::Sprite& sprite1, const sf::Sprite& sprite2) {
+
+    sf::Vector2f dinoPos = sprite1.getPosition();
+    sf::Vector2f obstaclePos = sprite2.getPosition();
+
+    float dinoWidth, dinoHeight;
+    if (isCrouching && !isJumping) {
+        dinoWidth = DINO_SIZE;
+        dinoHeight = DINO_CROUCH_HEIGHT;
+    }
+    else {
+        dinoWidth = DINO_SIZE;
+        dinoHeight = DINO_SIZE;
+    }
+
+    float obstacleWidth = OBSTACLE_WIDTH;
+    float obstacleHeight = OBSTACLE_HEIGHT;
+
+    const sf::Texture* obstacleTexture = sprite2.getTexture();
+    if (obstacleTexture == &obstacleTexture2) {
+        obstacleWidth = OBSTACLE2_WIDTH;
+    }
+    else if (obstacleTexture == &obstacleTexture3) {
+        obstacleWidth = OBSTACLE3_WIDTH;
+    }
+    else if (obstacleTexture == &birdTexture1 || obstacleTexture == &birdTexture2) {
+        obstacleWidth = BIRD_WIDTH;
+        obstacleHeight = BIRD_HEIGHT;
+    }
+
+    sf::FloatRect bounds1(dinoPos.x, dinoPos.y, dinoWidth, dinoHeight);
+    sf::FloatRect bounds2(obstaclePos.x, obstaclePos.y, obstacleWidth, obstacleHeight);
+
+    
+    if (isCrouching && !isJumping) {
+        bounds1.left += 4;
+        bounds1.top += 4;
+        bounds1.width -= 8;
+        bounds1.height -= 8;
+    }
+    else {
+        bounds1.left += 4;
+        bounds1.top += 4;
+        bounds1.width -= 8;
+        bounds1.height -= 8;
+    }
+
+    bounds2.left += 2;
+    bounds2.top += 2;
+    bounds2.width -= 4;
+    bounds2.height -= 4;
+
+   
+    bool collision = bounds1.intersects(bounds2);
+
+    return collision;
 }
 
 void DinoGame::UpdateEntities(float deltaTime) {
@@ -368,24 +458,28 @@ void DinoGame::UpdateGround(float deltaTime) {
 
 void DinoGame::SpawnObstacle() {
     sf::Sprite obstacle;
+    float obstacleWidth = OBSTACLE_WIDTH;
 
     int obstacleType = obstacleTypeDist(rng);
 
     switch (obstacleType) {
     case 1:
         obstacle.setTexture(obstacleTexture1);
+        obstacleWidth = OBSTACLE_WIDTH;
         break;
     case 2:
         obstacle.setTexture(obstacleTexture2);
+        obstacleWidth = OBSTACLE2_WIDTH;
         break;
     case 3:
         obstacle.setTexture(obstacleTexture3);
+        obstacleWidth = OBSTACLE3_WIDTH;
         break;
     }
 
     sf::Vector2u textureSize = obstacle.getTexture()->getSize();
     if (textureSize.x > 0 && textureSize.y > 0) {
-        float scaleX = OBSTACLE_WIDTH / textureSize.x;
+        float scaleX = obstacleWidth / textureSize.x;
         float scaleY = OBSTACLE_HEIGHT / textureSize.y;
         obstacle.setScale(scaleX, scaleY);
     }
@@ -436,7 +530,6 @@ void DinoGame::CheckCollisions() {
     }
 
     // Sprawdzanie kolizji z ptakami
-    if (isGameRunning) {
         for (const auto& bird : birdSprites) {
             if (CheckSpriteCollision(dinoSprite, bird)) {
                 isGameRunning = false;
@@ -444,50 +537,26 @@ void DinoGame::CheckCollisions() {
                 break;
             }
         }
-    }
-}
-
-bool DinoGame::CheckSpriteCollision(const sf::Sprite& sprite1, const sf::Sprite& sprite2) {
-    sf::FloatRect bounds1 = sprite1.getGlobalBounds();
-    sf::FloatRect bounds2 = sprite2.getGlobalBounds();
-
-    // Zmniejszanie obszaru kolizji dla bardziej sprawiedliwej gry
-    bounds1.left += 4;
-    bounds1.top += 4;
-    bounds1.width -= 8;
-    bounds1.height -= 8;
-
-    bounds2.left += 2;
-    bounds2.top += 2;
-    bounds2.width -= 4;
-    bounds2.height -= 4;
-
-    return bounds1.intersects(bounds2);
-}
-
-bool DinoGame::CheckCollision(const sf::RectangleShape& rect1, const sf::RectangleShape& rect2) {
-    sf::FloatRect bounds1 = rect1.getGlobalBounds();
-    sf::FloatRect bounds2 = rect2.getGlobalBounds();
-
-    bounds1.left += 2;
-    bounds1.top += 2;
-    bounds1.width -= 4;
-    bounds1.height -= 4;
-
-    return bounds1.intersects(bounds2);
+    
 }
 
 void DinoGame::Jump() {
-    if (!isJumping && isGameRunning) {
+    if (!isJumping && !isCrouching && isGameRunning) {
         dinoVelocityY = JUMP_FORCE;
         isJumping = true;
-        isCrouching = false;
     }
 }
 
 void DinoGame::Crouch(bool crouch) {
-    if (isGameRunning && !isJumping) {
-        isCrouching = crouch;
+    if (isGameRunning) {
+        if (crouch) {
+            if (!isJumping && dinoY >= GROUND_Y - DINO_SIZE - 5) {
+                isCrouching = true;
+            }
+        }
+        else {
+            isCrouching = false;
+        }
     }
 }
 
@@ -526,20 +595,17 @@ void DinoGame::Render() {
     }
 
     // Rysuj dinozaura
-    dinoSprite.setColor(sf::Color::White);
     window->draw(dinoSprite);
 
     // Rysuj przeszkody
     for (const auto& obstacle : obstacleSprites) {
         sf::Sprite tempObstacle = obstacle;
-        tempObstacle.setColor(sf::Color::White);
         window->draw(tempObstacle);
     }
 
     // Rysuj ptaki
     for (const auto& bird : birdSprites) {
         sf::Sprite tempBird = bird;
-        tempBird.setColor(sf::Color::White);
         window->draw(tempBird);
     }
 

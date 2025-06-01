@@ -21,7 +21,8 @@ DinoGame::DinoGame()
     obstacleTypeDist(1, 3),
     entityTypeDist(1, 100),
     spawnVariationDist(-5, 5),
-    animationTimer(0), currentDinoFrame(0), currentBirdFrame(0) {
+    animationTimer(0), currentDinoFrame(0), currentBirdFrame(0), isPaused(false), showMenu(true)
+{
     LoadHighScore();
 }
 
@@ -73,6 +74,44 @@ bool DinoGame::Initialize(sf::RenderWindow* gameWindow) {
         (window->getSize().y - textBounds.height) / 2
     );
 
+    startText.setFont(font);
+    startText.setCharacterSize(32);
+    startText.setFillColor(sf::Color::Black);
+    startText.setString("Press SPACE to Start");
+    sf::FloatRect startBounds = startText.getLocalBounds();
+    startText.setPosition(
+        (window->getSize().x - startBounds.width) / 2,
+        window->getSize().y / 2 - 50
+    );
+
+    instructionsText.setFont(font);
+    instructionsText.setCharacterSize(16);
+    instructionsText.setFillColor(sf::Color::Black);
+    instructionsText.setString("UP/SPACE: Jump | DOWN: Crouch | P: Pause | R: Restart");
+    sf::FloatRect instrBounds = instructionsText.getLocalBounds();
+    instructionsText.setPosition(
+        (window->getSize().x - instrBounds.width) / 2,
+        window->getSize().y / 2 + 20
+    );
+
+    pauseText.setFont(font);
+    pauseText.setCharacterSize(28);
+    pauseText.setFillColor(sf::Color::Blue);
+    pauseText.setString("PAUSED - Press P to Continue");
+    sf::FloatRect pauseBounds = pauseText.getLocalBounds();
+    pauseText.setPosition(
+        (window->getSize().x - pauseBounds.width) / 2,
+        (window->getSize().y - pauseBounds.height) / 2
+    );
+
+    menuBackground.setSize(sf::Vector2f(window->getSize().x, window->getSize().y));
+    menuBackground.setFillColor(sf::Color(255, 255, 255, 200));
+
+    CreateButton(startButton, "START GAME", window->getSize().x / 2 - 75, window->getSize().y / 2 - 25, 150, 50);
+    CreateButton(pauseButton, "PAUSE", 10, 10, 80, 30);
+    CreateButton(restartButton, "RESTART", 100, 10, 80, 30);
+    CreateButton(exitButton, "EXIT", window->getSize().x / 2 - 50, window->getSize().y / 2 + 50, 100, 40);
+
     // Inicjalizacja dinozaura
     dinoSprite.setTexture(dinoRunTexture1);
 
@@ -80,7 +119,13 @@ bool DinoGame::Initialize(sf::RenderWindow* gameWindow) {
     dinoY = GROUND_Y - DINO_SIZE;
 
     // Reset stanu gry
-    Restart();
+    isGameRunning = false;
+    dinoY = GROUND_Y - DINO_SIZE;
+    dinoVelocityY = 0;
+    dinoSprite.setPosition(DINO_X, dinoY);
+    dinoSprite.setTexture(dinoRunTexture1);
+    obstacleSprites.clear();
+    birdSprites.clear();
 
     return true;
 }
@@ -206,10 +251,17 @@ void DinoGame::Restart() {
 
     obstacleSprites.clear();
     birdSprites.clear();
+
+    isPaused = false;
+    showMenu = false;
 }
 
 bool DinoGame::Update(float deltaTime) {
-    if (!isGameRunning) {
+    if (!isGameRunning && !showMenu) {
+        return true;
+    }
+
+    if (isPaused || showMenu) {
         return true;
     }
 
@@ -566,6 +618,7 @@ void DinoGame::Render() {
     sf::Color bgColor = sf::Color(247, 247, 247);
     window->clear(bgColor);
 
+    // Rysowanie podloza
     if (hasGroundTexture) {
         float textureWidth = static_cast<float>(groundTexture.getSize().x);
         float windowWidth = static_cast<float>(window->getSize().x);
@@ -609,22 +662,40 @@ void DinoGame::Render() {
         window->draw(tempBird);
     }
 
-    // Rysuj interfejs uzytkownika
-    sf::Color textColor = sf::Color::Black;
-
-    scoreText.setFillColor(textColor);
-    highScoreText.setFillColor(textColor);
-
-    scoreText.setString("Score: " + std::to_string(score));
-    highScoreText.setString("High Score: " + std::to_string(highScore));
-
-    window->draw(scoreText);
-    window->draw(highScoreText);
-
-    // Rysuj komunikat o koncu gry
-    if (!isGameRunning) {
-        gameOverText.setFillColor(sf::Color::Red);
+    if (showMenu) {
+        // Menu glowne
+        window->draw(menuBackground);
+        window->draw(startButton.shape);
+        window->draw(startButton.text);
+        window->draw(exitButton.shape);
+        window->draw(exitButton.text);
+    }
+    else if (isPaused) {
+        // Stan pauzy
+        window->draw(pauseText);
+    }
+    else if (!isGameRunning) {
+        // Game Over
         window->draw(gameOverText);
+    }
+
+    if (!showMenu) {
+        sf::Color textColor = sf::Color::Black;
+        scoreText.setFillColor(textColor);
+        highScoreText.setFillColor(textColor);
+
+        scoreText.setString("Score: " + std::to_string(score));
+        highScoreText.setString("High Score: " + std::to_string(highScore));
+
+        window->draw(scoreText);
+        window->draw(highScoreText);
+
+        if (isGameRunning) {
+            window->draw(pauseButton.shape);
+            window->draw(pauseButton.text);
+            window->draw(restartButton.shape);
+            window->draw(restartButton.text);
+        }
     }
 
     window->display();
@@ -634,6 +705,89 @@ void DinoGame::Cleanup() {
     obstacleSprites.clear();
     birdSprites.clear();
     window = nullptr;
+}
+
+void DinoGame::TogglePause() {
+    if (isGameRunning && !showMenu) {
+        isPaused = !isPaused;
+    }
+}
+
+void DinoGame::ShowStartMenu() {
+    showMenu = true;
+    isPaused = false;
+}
+
+void DinoGame::HideStartMenu() {
+    showMenu = false;
+}
+
+void DinoGame::CreateButton(Button& button, const std::string& text, float x, float y, float width, float height) {
+    button.shape.setSize(sf::Vector2f(width, height));
+    button.shape.setPosition(x, y);
+    button.shape.setFillColor(sf::Color(200, 200, 200));
+    button.shape.setOutlineThickness(2);
+    button.shape.setOutlineColor(sf::Color::Black);
+
+    button.text.setFont(font);
+    button.text.setString(text);
+    button.text.setCharacterSize(16);
+    button.text.setFillColor(sf::Color::Black);
+
+    sf::FloatRect textBounds = button.text.getLocalBounds();
+    button.text.setPosition(
+        x + (width - textBounds.width) / 2,
+        y + (height - textBounds.height) / 2 - 5
+    );
+}
+
+void DinoGame::UpdateButtonState(Button& button, sf::Vector2i mousePos) {
+    sf::FloatRect bounds = button.shape.getGlobalBounds();
+    button.isHovered = bounds.contains(static_cast<float>(mousePos.x), static_cast<float>(mousePos.y));
+
+    if (button.isHovered) {
+        button.shape.setFillColor(sf::Color(150, 150, 255));
+    }
+    else {
+        button.shape.setFillColor(sf::Color(200, 200, 200));
+    }
+}
+
+bool DinoGame::IsButtonClicked(const Button& button, sf::Vector2i mousePos, bool mouseClick) {
+    if (!mouseClick) return false;
+    sf::FloatRect bounds = button.shape.getGlobalBounds();
+    return bounds.contains(static_cast<float>(mousePos.x), static_cast<float>(mousePos.y));
+}
+
+void DinoGame::UpdateGUI(sf::Vector2i mousePosition, bool mouseClick) {
+    mousePos = mousePosition;
+
+    if (showMenu) {
+        UpdateButtonState(startButton, mousePos);
+        UpdateButtonState(exitButton, mousePos);
+
+        if (IsButtonClicked(startButton, mousePos, mouseClick)) {
+            HideStartMenu();
+            Restart();
+        }
+        if (IsButtonClicked(exitButton, mousePos, mouseClick)) {
+            if (window) {
+                window->close();
+            }
+        }
+    }
+
+    if (isGameRunning && !showMenu) {
+        UpdateButtonState(pauseButton, mousePos);
+        UpdateButtonState(restartButton, mousePos);
+
+        if (IsButtonClicked(pauseButton, mousePos, mouseClick)) {
+            TogglePause();
+        }
+        if (IsButtonClicked(restartButton, mousePos, mouseClick)) {
+            Restart();
+        }
+    }
 }
 
 // Implementacja API C
@@ -669,7 +823,11 @@ extern "C" {
             }
             if (event.type == sf::Event::KeyPressed) {
                 if (event.key.code == sf::Keyboard::Space || event.key.code == sf::Keyboard::Up) {
-                    if (g_game->IsRunning()) {
+                    if (g_game->IsMenuVisible()) {
+                        g_game->HideStartMenu();
+                        g_game->Restart();
+                    }
+                    else if (g_game->IsRunning()) {
                         g_game->Jump();
                     }
                     else {
@@ -679,11 +837,27 @@ extern "C" {
                 if (event.key.code == sf::Keyboard::Down) {
                     g_game->Crouch(true);
                 }
+                if (event.key.code == sf::Keyboard::P) {
+                    g_game->TogglePause();
+                }
+                if (event.key.code == sf::Keyboard::R) {
+                    g_game->Restart();
+                }
             }
             if (event.type == sf::Event::KeyReleased) {
                 if (event.key.code == sf::Keyboard::Down) {
                     g_game->Crouch(false);
                 }
+            }
+            if (event.type == sf::Event::MouseButtonPressed) {
+                if (event.mouseButton.button == sf::Mouse::Left) {
+                    sf::Vector2i mousePos = sf::Mouse::getPosition(*g_window);
+                    g_game->UpdateGUI(mousePos, true);
+                }
+            }
+            if (event.type == sf::Event::MouseMoved) {
+                sf::Vector2i mousePos = sf::Mouse::getPosition(*g_window);
+                g_game->UpdateGUI(mousePos, false);
             }
         }
 

@@ -27,20 +27,20 @@ private:
     sf::RenderWindow* window;
 
     // Tekstury dla roznych elementow gry
-    sf::Texture dinoRunTexture1;      
-    sf::Texture dinoRunTexture2;      
+    sf::Texture dinoRunTexture1;
+    sf::Texture dinoRunTexture2;
     sf::Texture dinoDeadTexture;
-    sf::Texture dinoCrouchTexture1; 
+    sf::Texture dinoCrouchTexture1;
     sf::Texture dinoCrouchTexture2;
-    sf::Texture birdTexture1;         
-    sf::Texture birdTexture2;         
-    sf::Texture obstacleTexture1;     
-    sf::Texture obstacleTexture2;     
-    sf::Texture obstacleTexture3;     
+    sf::Texture birdTexture1;
+    sf::Texture birdTexture2;
+    sf::Texture obstacleTexture1;
+    sf::Texture obstacleTexture2;
+    sf::Texture obstacleTexture3;
 
     // Tekstura podloza
-    sf::Texture groundTexture;    
-    bool hasGroundTexture;            
+    sf::Texture groundTexture;
+    bool hasGroundTexture;
 
     // Sprite dinozaura i podloza
     sf::Sprite dinoSprite;
@@ -90,6 +90,29 @@ private:
 
     void ApplyDinoScaling(float targetWidth, float targetHeight);
 
+    // GUI
+    sf::RectangleShape menuBackground;
+    sf::Text startText;
+    sf::Text instructionsText;
+    sf::Text pauseText;
+    bool isPaused;
+    bool showMenu;
+    struct Button {
+        sf::RectangleShape shape;
+        sf::Text text;
+        bool isHovered;
+        bool isPressed;
+
+        Button() : isHovered(false), isPressed(false) {}
+    };
+
+    Button startButton;
+    Button pauseButton;
+    Button restartButton;
+    Button exitButton;
+    sf::Vector2i mousePos;
+    bool mousePressed;
+
 public:
     DinoGame();
     ~DinoGame();
@@ -137,4 +160,15 @@ public:
     bool IsRunning() const { return isGameRunning; }
     int GetScore() const { return score; }
     int GetHighScore() const { return highScore; }
+
+    // GUI
+    void TogglePause();
+    void ShowStartMenu();
+    void HideStartMenu();
+    bool IsMenuVisible() const { return showMenu; }
+    bool IsPaused() const { return isPaused; }
+    void UpdateGUI(sf::Vector2i mousePosition, bool mouseClick);
+    void CreateButton(Button& button, const std::string& text, float x, float y, float width, float height);
+    bool IsButtonClicked(const Button& button, sf::Vector2i mousePos, bool mouseClick);
+    void UpdateButtonState(Button& button, sf::Vector2i mousePos);
 };

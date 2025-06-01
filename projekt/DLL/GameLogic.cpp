@@ -15,7 +15,7 @@ DinoGame::DinoGame()
     nextSpawnScore(BASE_SPAWN_INTERVAL), currentSpawnInterval(BASE_SPAWN_INTERVAL),
     isGameRunning(false), isJumping(false), isCrouching(false),
     score(0), highScore(0), scoreTimer(0), groundOffsetX(0),
-    hasGroundTexture(false),
+    hasGroundTexture(false), musicLoaded(false),
     rng(std::random_device{}()),
     birdHeightDist(350.0f, 400.0f),
     obstacleTypeDist(1, 3),
@@ -27,6 +27,7 @@ DinoGame::DinoGame()
 }
 
 DinoGame::~DinoGame() {
+    StopMusic();
     SaveHighScore();
     Cleanup();
 }
@@ -41,6 +42,11 @@ bool DinoGame::Initialize(sf::RenderWindow* gameWindow) {
     // Ladowanie tekstur
     if (!LoadTextures()) {
         return false;
+    }
+
+    // Ladowanie muzyki
+    if (!LoadMusic("background_music.ogg")) {
+        std::cout << "Nie zaladowano muzyki" << std::endl;
     }
 
     // Proba zaladowania tekstury podloza
@@ -254,6 +260,9 @@ void DinoGame::Restart() {
 
     isPaused = false;
     showMenu = false;
+
+    PlayMusic();
+
 }
 
 bool DinoGame::Update(float deltaTime) {
@@ -576,6 +585,7 @@ void DinoGame::CheckCollisions() {
     for (const auto& obstacle : obstacleSprites) {
         if (CheckSpriteCollision(dinoSprite, obstacle)) {
             isGameRunning = false;
+            StopMusic();
             SaveHighScore();
             break;
         }
@@ -585,6 +595,7 @@ void DinoGame::CheckCollisions() {
         for (const auto& bird : birdSprites) {
             if (CheckSpriteCollision(dinoSprite, bird)) {
                 isGameRunning = false;
+                StopMusic();
                 SaveHighScore();
                 break;
             }
@@ -710,6 +721,12 @@ void DinoGame::Cleanup() {
 void DinoGame::TogglePause() {
     if (isGameRunning && !showMenu) {
         isPaused = !isPaused;
+        if (isPaused) {
+            PauseMusic();
+        }
+        else {
+            PlayMusic();
+        }
     }
 }
 
@@ -771,6 +788,7 @@ void DinoGame::UpdateGUI(sf::Vector2i mousePosition, bool mouseClick) {
             Restart();
         }
         if (IsButtonClicked(exitButton, mousePos, mouseClick)) {
+            StopMusic();
             if (window) {
                 window->close();
             }
@@ -787,6 +805,44 @@ void DinoGame::UpdateGUI(sf::Vector2i mousePosition, bool mouseClick) {
         if (IsButtonClicked(restartButton, mousePos, mouseClick)) {
             Restart();
         }
+    }
+}
+
+bool DinoGame::LoadMusic(const std::string& filename) {
+    if (backgroundMusic.openFromFile(filename)) {
+        musicLoaded = true;
+        backgroundMusic.setLoop(true);
+        backgroundMusic.setVolume(50.0f);  
+        return true;
+    }
+
+    musicLoaded = false;
+    return false;
+}
+
+void DinoGame::PlayMusic() {
+    if (musicLoaded && backgroundMusic.getStatus() != sf::Music::Playing) {
+        backgroundMusic.play();
+    }
+}
+
+void DinoGame::PauseMusic() {
+    if (musicLoaded && backgroundMusic.getStatus() == sf::Music::Playing) {
+        backgroundMusic.pause();
+    }
+}
+
+void DinoGame::StopMusic() {
+    if (musicLoaded) {
+        backgroundMusic.stop();
+    }
+}
+
+void DinoGame::SetMusicVolume(float volume) {
+    if (musicLoaded) {
+        // Ograniczenie glosnosci
+        volume = std::max(0.0f, std::min(100.0f, volume));
+        backgroundMusic.setVolume(volume);
     }
 }
 

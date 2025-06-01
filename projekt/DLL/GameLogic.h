@@ -2,6 +2,8 @@
 #include <vector>
 #include <random>
 #include <fstream>
+#include <SFML/Audio.hpp>
+
 
 // Stale gry
 const float GROUND_Y = 450.0f;
@@ -113,6 +115,10 @@ private:
     sf::Vector2i mousePos;
     bool mousePressed;
 
+    // Muzyka
+    sf::Music backgroundMusic;
+    bool musicLoaded;
+
 public:
     DinoGame();
     ~DinoGame();
@@ -171,4 +177,11 @@ public:
     void CreateButton(Button& button, const std::string& text, float x, float y, float width, float height);
     bool IsButtonClicked(const Button& button, sf::Vector2i mousePos, bool mouseClick);
     void UpdateButtonState(Button& button, sf::Vector2i mousePos);
+
+    // Muzyka
+    bool LoadMusic(const std::string& filename);
+    void PlayMusic();
+    void PauseMusic();
+    void StopMusic();
+    void SetMusicVolume(float volume);
 };
